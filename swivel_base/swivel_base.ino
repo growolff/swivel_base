@@ -7,7 +7,7 @@
 #define XP 9   // can be a digital pin
 
 #define MINPRESSURE 100
-#define MAXPRESSURE 350
+#define MAXPRESSURE 320
 
 #define LCD_CS A3 // Chip Select goes to Analog 3
 #define LCD_RS A2 // Command/Data goes to Analog 2
@@ -127,8 +127,22 @@ bool b1_flag, b2_flag, b3_flag, b4_flag, b5_flag;
 #define ANGULO    2
 #define VELOCIDAD 3
 
-int tiem = 0, angle = 0, vel = 10;
+int tiem = 1, vel = 10;
+float angle = 18;
 int mode = 1;
+
+#define M_EN 10
+#define M_DIR 11
+#define M_STEP 12
+
+int en_st = 0;
+int dir_st = 0;
+int step_st = 0;
+
+int giranding = 0;
+int tiempo = 5000;
+
+unsigned long dt = 0;
 
 void readResistiveTouch(void)
 {
@@ -144,12 +158,13 @@ void readResistiveTouch(void)
   X = map(tp.x, TS_MAXX, TS_MINX, 0, W); // valores invertidos
   Y = map(tp.y, TS_MINY, TS_MAXY, 0, H);
   Z = tp.z;
-  if (Z > MINPRESSURE && Z < MAXPRESSURE) {
+  /*
+    if (Z > MINPRESSURE && Z < MAXPRESSURE) {
     _press = true;
-  }
-  else {
+    }
+    else {
     _press = false;
-  }
+    }*/
 
   /*
     if (Z > MINPRESSURE && Z < MAXPRESSURE) {
@@ -169,11 +184,12 @@ void readResistiveTouch(void)
   */
 }
 
-unsigned long dt = 0;
-
-
 void setup() {
   Serial.begin(9600);
+
+  pinMode(M_EN, OUTPUT);
+  pinMode(M_DIR, OUTPUT);
+  pinMode(M_STEP, OUTPUT);
   /*
     randomSeed(analogRead(0));
     pinMode(A0, OUTPUT);
@@ -191,9 +207,10 @@ void setup() {
   myGLCD.fillScreen(BLACK);
   dibujarMenu();
 
-  myGLCD.setColor(GRAY_1, GRAY_1, GRAY_1);
+  //myGLCD.setColor(GRAY_1, GRAY_1, GRAY_1);
+  myGLCD.setColor(BLACK, BLACK, BLACK);
   myGLCD.drawRect(TZ_X , TZ_Y, TZ_WP , TZ_HP);
-  
+
   dt = millis();
 }
 
@@ -221,28 +238,55 @@ void loop()
   }
   if (sel == 4 && b4_flag == HIGH) {
     touchB4();
+    Serial.print("M_EN: ");
+    Serial.println(en_st);
     b4_flag = LOW;
     updateData();
+    dt = millis();
   }
   if (sel == 5 && b5_flag == HIGH) {
     touchB5();
     b5_flag = LOW;
     updateData();
   }
+  /*
+    if ( millis() - dt > 1000 ) {
+      //updateData();
+      //Serial.print("Selection: ");
+      //Serial.println(sel);
+      //Serial.print("PRESSED? ");
+      //Serial.println(_press ? "SI" : "NO");
+      dt = millis();
+    }*/
 
-  if ( millis() - dt > 1000 ) {
-    //updateData();
-    //Serial.print("Selection: ");
-    //Serial.println(sel);
-    //Serial.print("PRESSED? ");
-    //Serial.println(_press ? "SI" : "NO");
-    dt = millis();
+  digitalWrite(M_EN, HIGH); //Giro hacia un sentido
+  digitalWrite(M_DIR, HIGH); //Giro hacia un sentido
+
+  if (en_st == 1) {
+    digitalWrite(M_EN, LOW); // driver tiene la lógica inversa
+    int nsteps = int(angle / 1.8);
+
+    if (giranding == 0) {
+      for (int i = 0; i < nsteps; i++)
+      {
+        digitalWrite(M_STEP, HIGH);
+        delayMicroseconds(tiempo);
+        digitalWrite(M_STEP, LOW);
+        delayMicroseconds(tiempo);
+      }
+      giranding = 1;
+    }
+    if ( millis() - dt > tiem * 1000) {
+      giranding = 0;
+      dt = millis();
+    }
+    //Serial.println("PASO COMPLETED");
   }
 
   //myGLCD.setColor(0, 0, 255);
   //myGLCD.drawRect(0, 14, 319, 225);
 
-  delay(100);
+  //delay(100);
 }
 
 void dibujarMenu() {
@@ -274,53 +318,53 @@ void dibujarMenu() {
   myGLCD.fillRoundRect(B4_X, B4_Y, B4_W, B4_H);
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("START", (B4_X+15), (B4_H - B4_Y) / 2);
+  myGLCD.print("START", (B4_X + 15), (B4_H - B4_Y) / 2);
 
   // boton 5 stop
-  myGLCD.setColor(255, 0, 0); 
+  myGLCD.setColor(255, 0, 0);
   myGLCD.fillRoundRect(B5_X, B5_Y, B5_W, B5_H);
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("STOP", (B5_X+25), (B5_Y+45));
+  myGLCD.print("STOP", (B5_X + 25), (B5_Y + 45));
 
   // actual value
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("time", TZ_X+MARGIN,TZ_Y+MARGIN);
+  myGLCD.print("time", TZ_X + MARGIN, TZ_Y + MARGIN);
   // value
   myGLCD.setTextSize(3);
   myGLCD.setTextColor(WHITE);
-  myGLCD.printNumI(0, TZ_X+MARGIN,TZ_Y+MARGIN*4);
+  myGLCD.printNumI(0, TZ_X + MARGIN, TZ_Y + MARGIN * 4);
 
   // time
   myGLCD.setTextSize(1);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("time:  ", TIME_X,TIME_Y, 123);
+  myGLCD.print("time:  ", TIME_X, TIME_Y, 123);
   // time value
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.printNumI(tiem, TIME_X+DELTA_X,TIME_Y);
-  
+  myGLCD.printNumI(tiem, TIME_X + DELTA_X, TIME_Y);
+
   // angle
   myGLCD.setTextSize(1);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("angle: ", ANGLE_X,ANGLE_Y, 123);
+  myGLCD.print("angle: ", ANGLE_X, ANGLE_Y, 123);
   // angle value
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.printNumI(angle, ANGLE_X+DELTA_X,ANGLE_Y);
+  myGLCD.printNumI(angle, ANGLE_X + DELTA_X, ANGLE_Y);
 
   // vel
   myGLCD.setTextSize(1);
   myGLCD.setTextColor(WHITE);
-  myGLCD.print("vel:   ", VEL_X,VEL_Y, 123);
+  myGLCD.print("vel:   ", VEL_X, VEL_Y, 123);
   // vel value
   myGLCD.setTextSize(2);
   myGLCD.setTextColor(WHITE);
-  myGLCD.printNumI(vel, VEL_X+DELTA_X,VEL_Y);
+  myGLCD.printNumI(vel, VEL_X + DELTA_X, VEL_Y);
 
-  
-  
+
+
   //myGLCD.setColor(64, 64, 64);
   //myGLCD.fillRect(0, 226, 319, 239);
   //myGLCD.setColor(255, 255, 255);
@@ -336,141 +380,143 @@ int getSelection() {
 
   int sel = 0;
   // boton 1
-  if ((X > B1_X && X < B1_W ) && (Y > B1_Y && Y < B1_H ) && b1_flag == LOW && _press == true) {
-    b1_flag = HIGH;
-    Serial.print("B1 pressed.. ");
-    //Serial.print("\tz: ");
-    //Serial.println(Z);
-    // cambia de color el boton
-    myGLCD.setColor(255, 0, 0);
-    myGLCD.fillRoundRect(B1_X, B1_Y, B1_W, B1_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(BLACK);
-    myGLCD.print("+1", (B1_W - B1_X) / 2, (B1_H - B1_Y) / 2, 1);
-    while (Z < MAXPRESSURE) {
-      readResistiveTouch();
+  if (Z > MINPRESSURE && Z < MAXPRESSURE) {
+    if ((X > B1_X && X < B1_W ) && (Y > B1_Y && Y < B1_H ) && b1_flag == LOW) {
+      b1_flag = HIGH;
+      Serial.print("B1 pressed.. ");
+      //Serial.print("\tz: ");
+      //Serial.println(Z);
+      // cambia de color el boton
+      myGLCD.setColor(255, 0, 0);
+      myGLCD.fillRoundRect(B1_X, B1_Y, B1_W, B1_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(BLACK);
+      myGLCD.print("+1", (B1_W - B1_X) / 2, (B1_H - B1_Y) / 2, 1);
+      while (Z < MAXPRESSURE) {
+        readResistiveTouch();
+      }
+      // vuelve al color original
+      myGLCD.setColor(255, 0, 85); //magenta
+      myGLCD.fillRoundRect(B1_X, B1_Y, B1_W, B1_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("+1", (B1_W - B1_X) / 2, (B1_H - B1_Y) / 2, 1);
+      Serial.println("released");
+      sel = 1;
     }
-    // vuelve al color original
-    myGLCD.setColor(255, 0, 85); //magenta
-    myGLCD.fillRoundRect(B1_X, B1_Y, B1_W, B1_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("+1", (B1_W - B1_X) / 2, (B1_H - B1_Y) / 2, 1);
-    Serial.println("released");
-    sel = 1;
-  }
-  if ((X > B2_X && X < B2_W ) && (Y > B2_Y && Y < B2_H ) && b2_flag == LOW && _press == true ) {
-    b2_flag = HIGH;
-    Serial.print("B2 pressed.. ");
-    myGLCD.setColor(0, 0, 255);
-    myGLCD.fillRoundRect(B2_X, B2_Y, B2_W, B2_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(BLACK);
-    myGLCD.print("MODE", (B2_W - B2_X) / 4, (B2_H - B2_Y) / 2);
-    while (Z < MAXPRESSURE) {
-      readResistiveTouch();
+    if ((X > B2_X && X < B2_W ) && (Y > B2_Y && Y < B2_H ) && b2_flag == LOW ) {
+      b2_flag = HIGH;
+      Serial.print("B2 pressed.. ");
+      myGLCD.setColor(0, 0, 255);
+      myGLCD.fillRoundRect(B2_X, B2_Y, B2_W, B2_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(BLACK);
+      myGLCD.print("MODE", (B2_W - B2_X) / 4, (B2_H - B2_Y) / 2);
+      while (Z < MAXPRESSURE) {
+        readResistiveTouch();
+      }
+      myGLCD.setColor(36, 182, 255); // calipso
+      myGLCD.fillRoundRect(B2_X, B2_Y, B2_W, B2_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("MODE", (B2_W - B2_X) / 4, (B2_H - B2_Y) / 2);
+      Serial.println("released");
+      sel = 2;
     }
-    myGLCD.setColor(36, 182, 255); // calipso
-    myGLCD.fillRoundRect(B2_X, B2_Y, B2_W, B2_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("MODE", (B2_W - B2_X) / 4, (B2_H - B2_Y) / 2);
-    Serial.println("released");
-    sel = 2;
-  }
-  if ((X > B3_X && X < B3_W ) && (Y > B3_Y && Y < B3_H ) && b3_flag == LOW && _press == true ) {
-    b3_flag = HIGH;
-    Serial.print("B3 pressed.. ");
-    myGLCD.setColor(255, 0, 0);
-    myGLCD.fillRoundRect(B3_X, B3_Y, B3_W, B3_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(BLACK);
-    myGLCD.print("-1", (B3_W - B3_X) / 2, (B3_H - B3_Y) / 2, 1);
-    while (Z < MAXPRESSURE) {
-      readResistiveTouch();
+    if ((X > B3_X && X < B3_W ) && (Y > B3_Y && Y < B3_H ) && b3_flag == LOW) {
+      b3_flag = HIGH;
+      Serial.print("B3 pressed.. ");
+      myGLCD.setColor(255, 0, 0);
+      myGLCD.fillRoundRect(B3_X, B3_Y, B3_W, B3_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(BLACK);
+      myGLCD.print("-1", (B3_W - B3_X) / 2, (B3_H - B3_Y) / 2, 1);
+      while (Z < MAXPRESSURE) {
+        readResistiveTouch();
+      }
+      // vuelve al color original
+      myGLCD.setColor(255, 0, 85);
+      myGLCD.fillRoundRect(B3_X, B3_Y, B3_W, B3_H);
+      myGLCD.setTextSize(3);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("-1", (B3_W - B3_X) / 2, (B3_H - B3_Y) / 2, 1);
+      Serial.println("released");
+      sel = 3;
     }
-    // vuelve al color original
-    myGLCD.setColor(255, 0, 85);
-    myGLCD.fillRoundRect(B3_X, B3_Y, B3_W, B3_H);
-    myGLCD.setTextSize(3);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("-1", (B3_W - B3_X) / 2, (B3_H - B3_Y) / 2, 1);
-    Serial.println("released");
-    sel = 3;
-  }
-  if ((X > B4_X && X < B4_W ) && (Y > B4_Y && Y < B4_H ) && b4_flag == LOW && _press == true) {
-    b4_flag = HIGH;
-    Serial.print("B4 pressed.. ");
-    //Serial.print("\tz: ");
-    //Serial.println(Z);
-    // cambia de color el boton
+    if ((X > B4_X && X < B4_W ) && (Y > B4_Y && Y < B4_H ) && b4_flag == LOW) {
+      b4_flag = HIGH;
+      Serial.print("B4 pressed.. ");
+      //Serial.print("\tz: ");
+      //Serial.println(Z);
+      // cambia de color el boton
       myGLCD.setColor(0, 100, 0); //magenta
-    myGLCD.fillRoundRect(B4_X, B4_Y, B4_W, B4_H);
-    myGLCD.setTextSize(2);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("START", (B4_X+15), (B4_H - B4_Y) / 2);
-    while (Z < MAXPRESSURE) {
-      readResistiveTouch();
+      myGLCD.fillRoundRect(B4_X, B4_Y, B4_W, B4_H);
+      myGLCD.setTextSize(2);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("START", (B4_X + 15), (B4_H - B4_Y) / 2);
+      while (Z < MAXPRESSURE) {
+        readResistiveTouch();
+      }
+      // vuelve al color original
+      myGLCD.setColor(0, 255, 0); //magenta
+      myGLCD.fillRoundRect(B4_X, B4_Y, B4_W, B4_H);
+      myGLCD.setTextSize(2);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("START", (B4_X + 15), (B4_H - B4_Y) / 2);
+      Serial.println("released");
+      sel = 4;
     }
-    // vuelve al color original
-    myGLCD.setColor(0, 255, 0); //magenta
-    myGLCD.fillRoundRect(B4_X, B4_Y, B4_W, B4_H);
-    myGLCD.setTextSize(2);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("START", (B4_X+15), (B4_H - B4_Y) / 2);
-    Serial.println("released");
-    sel = 4;
-  }
-  if ((X > B5_X && X < B5_W ) && (Y > B5_Y && Y < B5_H ) && b5_flag == LOW && _press == true) {
-    b5_flag = HIGH;
-    Serial.print("B5 pressed.. ");
-    //Serial.print("\tz: ");
-    //Serial.println(Z);
-    // cambia de color el boton
-    myGLCD.setColor(100, 0, 0); 
-    myGLCD.fillRoundRect(B5_X, B5_Y, B5_W, B5_H);
-    myGLCD.setTextSize(2);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("STOP", (B5_X+25), (B5_Y+45));
-    while (Z < MAXPRESSURE) {
-      readResistiveTouch();
+    if ((X > B5_X && X < B5_W ) && (Y > B5_Y && Y < B5_H ) && b5_flag == LOW) {
+      b5_flag = HIGH;
+      Serial.print("B5 pressed.. ");
+      //Serial.print("\tz: ");
+      //Serial.println(Z);
+      // cambia de color el boton
+      myGLCD.setColor(100, 0, 0);
+      myGLCD.fillRoundRect(B5_X, B5_Y, B5_W, B5_H);
+      myGLCD.setTextSize(2);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("STOP", (B5_X + 25), (B5_Y + 45));
+      while (Z < MAXPRESSURE) {
+        readResistiveTouch();
+      }
+      // vuelve al color original
+      myGLCD.setColor(255, 0, 0); //magenta
+      myGLCD.fillRoundRect(B5_X, B5_Y, B5_W, B5_H);
+      myGLCD.setTextSize(2);
+      myGLCD.setTextColor(WHITE);
+      myGLCD.print("STOP", (B5_X + 25), (B5_Y + 45));
+      Serial.println("released");
+      sel = 5;
     }
-    // vuelve al color original
-    myGLCD.setColor(255, 0, 0); //magenta
-    myGLCD.fillRoundRect(B5_X, B5_Y, B5_W, B5_H);
-    myGLCD.setTextSize(2);
-    myGLCD.setTextColor(WHITE);
-    myGLCD.print("STOP", (B5_X+25), (B5_Y+45));
-    Serial.println("released");
-    sel = 5;
   }
 
   return sel;
 }
 
-void updateData(){
+void updateData() {
 
   myGLCD.setTextSize(2);
-  myGLCD.setTextColor(WHITE,BLACK);
-  myGLCD.print("        ", TZ_X+MARGIN, TZ_Y+MARGIN);
-  if(mode == TIEMPO) myGLCD.print("time", TZ_X+MARGIN, TZ_Y+MARGIN);
-  if(mode == VELOCIDAD) myGLCD.print("vel", TZ_X+MARGIN, TZ_Y+MARGIN);
-  if(mode == ANGULO) myGLCD.print("angle", TZ_X+MARGIN, TZ_Y+MARGIN);
+  myGLCD.setTextColor(WHITE, BLACK);
+  myGLCD.print("        ", TZ_X + MARGIN, TZ_Y + MARGIN);
+  if (mode == TIEMPO) myGLCD.print("time", TZ_X + MARGIN, TZ_Y + MARGIN);
+  if (mode == VELOCIDAD) myGLCD.print("vel", TZ_X + MARGIN, TZ_Y + MARGIN);
+  if (mode == ANGULO) myGLCD.print("angle", TZ_X + MARGIN, TZ_Y + MARGIN);
 
   myGLCD.setTextSize(2);
-  myGLCD.setTextColor(WHITE,BLACK);
-  myGLCD.print("   ", TIME_X+DELTA_X,TIME_Y);
-  myGLCD.printNumI(tiem, TIME_X+DELTA_X,TIME_Y);
-  
+  myGLCD.setTextColor(WHITE, BLACK);
+  myGLCD.print("   ", TIME_X + DELTA_X, TIME_Y);
+  myGLCD.printNumI(tiem, TIME_X + DELTA_X, TIME_Y);
+
   myGLCD.setTextSize(2);
-  myGLCD.setTextColor(WHITE,BLACK);
-  myGLCD.print("   ", ANGLE_X+DELTA_X,ANGLE_Y);
-  myGLCD.printNumI(angle, ANGLE_X+DELTA_X,ANGLE_Y);
-  
+  myGLCD.setTextColor(WHITE, BLACK);
+  myGLCD.print("   ", ANGLE_X + DELTA_X, ANGLE_Y);
+  myGLCD.printNumI(angle, ANGLE_X + DELTA_X, ANGLE_Y);
+
   myGLCD.setTextSize(2);
-  myGLCD.setTextColor(WHITE,BLACK);
-  myGLCD.print("   ", VEL_X+DELTA_X,VEL_Y);
-  myGLCD.printNumI(vel, VEL_X+DELTA_X,VEL_Y);
+  myGLCD.setTextColor(WHITE, BLACK);
+  myGLCD.print("   ", VEL_X + DELTA_X, VEL_Y);
+  myGLCD.printNumI(vel, VEL_X + DELTA_X, VEL_Y);
 
 }
 
@@ -482,7 +528,7 @@ void touchB1() {
     vel++;
   }
   if (mode == ANGULO) {
-    angle++;
+    angle += 1.8;
   }
 }
 
@@ -506,25 +552,18 @@ void touchB3() {
     vel--;
   }
   if (mode == ANGULO) {
-    angle--;
+    angle -= 1.8;
   }
 }
 
 void touchB4() {
-  Serial.println("START");
+  //Serial.println("START");
+  en_st = 1;
+  //digitalWrite(M_EN, !en_st);
 }
 
 void touchB5() {
-  Serial.println("STOP");
-}
-
-
-void drawButton(int *textColor, int textSize, String text, int *bColor, int bX, int bY, int bW, int bH, int textBack = BLACK ){
-
-    myGLCD.setColor(255, 0, 0);
-    myGLCD.fillRoundRect(bX, bY, bW, bH);
-    myGLCD.setTextSize(textSize);
-    myGLCD.setTextColor(textColor);
-    myGLCD.print(text, (bW - bX) / 2, (bH - bY) / 2);
-    
+  //Serial.println("STOP");
+  en_st = 0;
+  //digitalWrite(M_EN, !en_st);
 }
