@@ -1,7 +1,9 @@
 /* codigo para pantalla touch ILI9341 2,4" 320x240px (arduino shield)
  * por Gonzalo Olave y Joakin Ugalde para un proyecto de base rotatoria
- * 
- * (C) FabLab U. de Chile
+ *
+ * (C) Gonzalo Raúl Olave Wolff
+ * Codigo publicado bajo la licencia MIT
+ *
  */
 
 // These are the pins for the shield!
